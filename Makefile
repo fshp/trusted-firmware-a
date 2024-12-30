@@ -49,6 +49,9 @@ include ${MAKE_HELPERS_DIRECTORY}toolchain.mk
 ENABLE_ASSERTIONS		:= ${DEBUG}
 ENABLE_PMF			:= ${ENABLE_RUNTIME_INSTRUMENTATION}
 
+# Include Kconfig script
+include makeconfig_pre.mk
+
 ################################################################################
 # Checkpatch script options
 ################################################################################
@@ -163,11 +166,14 @@ ifneq (${DEBUG}, 0)
 	ASFLAGS		+=	-g -Wa,-gdwarf-4
 
 	# Use LOG_LEVEL_INFO by default for debug builds
-	LOG_LEVEL	:=	40
+	LOG_LEVEL	?=	40
 else
 	BUILD_TYPE	:=	release
+	TF_CFLAGS	+=	-g -gdwarf-4
+	ASFLAGS		+=	-g -Wa,-gdwarf-4
+
 	# Use LOG_LEVEL_NOTICE by default for release builds
-	LOG_LEVEL	:=	20
+	LOG_LEVEL	?=	20
 endif #(Debug)
 
 # Default build string (git branch and commit)
@@ -1126,6 +1132,11 @@ ifeq (${NEED_BL1},yes)
 include bl1/bl1.mk
 endif
 
+ifdef BL2PL_SOURCES
+NEED_BL2PL := yes
+include bl2pl/bl2pl.mk
+endif
+
 ifeq (${NEED_BL2},yes)
 include bl2/bl2.mk
 endif
@@ -1544,6 +1555,10 @@ ifeq (${NEED_SCP_BL2},yes)
 $(eval $(call TOOL_ADD_IMG,scp_bl2,--scp-fw))
 endif #(NEED_SCP_BL2)
 
+ifeq (${NEED_BL2PL},yes)
+$(eval $(call MAKE_BL,bl2pl))
+endif
+
 ifeq (${NEED_BL31},yes)
 BL31_SOURCES += ${SPD_SOURCES}
 # Sort BL31 source files to remove duplicates
@@ -1813,6 +1828,9 @@ help:
 	$(s)echo ""
 	$(s)echo "example: build all targets for the FVP platform:"
 	$(s)echo "  CROSS_COMPILE=aarch64-none-elf- make PLAT=fvp all"
+
+# Include Kconfig script
+include makeconfig_post.mk
 
 .PHONY: FORCE
 FORCE:;

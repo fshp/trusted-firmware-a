@@ -212,6 +212,9 @@ define CERT_ADD_CMD_OPT
     $(3)CRT_ARGS += $(2) $(1)
 endef
 
+define CERT_REMOVE_CMD_OPT
+    $(3)CRT_ARGS := $(filter-out $(2) $(1),$(CRT_ARGS))
+endef
 # TOOL_ADD_IMG allows the platform to specify an external image to be packed
 # in the FIP and/or for which certificate is generated. It also adds a
 # dependency on the image file, aborting the build if the file does not exist.
@@ -277,6 +280,15 @@ $(1): $(2)
 endef
 
 GZIP_SUFFIX := .gz
+
+# XZ
+define XZ_RULE
+$(1): $(2)
+	$(ECHO) "  XZ      $$@"
+	$(Q)xz -e -k -9 -C crc32 $$< --stdout > $$@
+endef
+
+XZ_SUFFIX := .xz
 
 ################################################################################
 # Auxiliary macros to build TF images from sources
@@ -469,6 +481,14 @@ ${LIB_DIR}/lib$(1).a: $(OBJS) | $$$$(@D)/
 	$$(q)$($(ARCH)-ar) cr $$@ $$?
 endef
 
+# ADD_PREBUILT_LIBS macro adding pre-built library
+# Arguments:
+#   $(1) = <lib_path>/<lib_name>.o
+define ADD_PREBUILT_LIB
+	$(eval OBJS += ${1})
+	$(eval -include $(patsubst %.o,%.d,${1}))
+endef
+
 # Generate the path to one or more preprocessed linker scripts given the paths
 # of their sources.
 #
@@ -523,6 +543,10 @@ endif
 # object file path, and prebuilt object file path.
 $(eval OBJS += $(MODULE_OBJS))
 
+$(if $(findstring 2,${1}) $(findstring 31,${1}),
+    $(foreach prebuilt_lib, ${PREBUILT_LIBS},
+        $(call ADD_PREBUILT_LIB, ${prebuilt_lib})))
+
 $(ELF): $(OBJS) $(DEFAULT_LINKER_SCRIPT) $(LINKER_SCRIPTS) | $$$$(@D)/ libraries $(BL_LIBS)
 	$$(s)echo "  LD      $$@"
 ifeq ($($(ARCH)-ld-id),arm-link)
@@ -540,6 +564,7 @@ else
 		$(addprefix -T ,$(LINKER_SCRIPTS)) --script $(DEFAULT_LINKER_SCRIPT) \
 		$(OBJS) $(LDPATHS) $(LIBWRAPPER) $(LDLIBS) $(BL_LIBS)
 endif
+
 ifeq ($(DISABLE_BIN_GENERATION),1)
 	$(s)echo
 	$(s)echo "Built $$@ successfully"
